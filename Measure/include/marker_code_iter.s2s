@@ -1,0 +1,90 @@
+'use marker code 1 0 0 0 for condition start
+var startcode%[4];
+ArrConst(startcode%[], 0);
+startcode%[0] := 1;
+                                                
+'use marker code 0 0 0 0 for condition END
+var endcode%[4];
+ArrConst(endcode%[], 0);
+
+'use marker code 2 0 0 0 for NO hypertraction
+var NACode%[4];
+ArrConst(NACode%[], 0);
+NACode%[0] := 2;
+
+func GetNextCode(chan%, time, code%[])
+    var nextcode%[4];
+    var codematch% := 1; 'codematch will be zero when match found
+    while (codematch%>0) do
+        time := NextTime(chan%,time, nextcode%[]);
+        ArrSub(nextcode%[], code%[]);
+        abs(nextcode%[]);
+        codematch% := ArrSum(nextcode%[]);
+        if (time=-1) then break endif;
+    wend;
+    return time
+end
+
+func GetLastCode(chan%, time, code%[])
+    var nextcode%[4];
+    var codematch% := 1; 'codematch will be zero when match found
+    while (codematch%>0) do
+        time := LastTime(chan%,time,nextcode%[]);
+        ArrSub(nextcode%[], code%[]);
+        abs(nextcode%[]);
+        codematch% := ArrSum(nextcode%[]);
+        if (time=-1) then break endif;
+    wend;
+    return time
+end
+
+func CountBrsts(chan%, StartT, EndT)
+    var NumEnds%, NumStarts%, NumBrsts%;
+    MarkMask(chan%, -1, 1, -1);  'Set all codes for all layers
+
+    'Mask Burst Ends
+    MarkMask(chan%, 0, 0, 0);
+    NumStarts% := Count(chan%, StartT, EndT);
+
+    'Mask Burst Starts
+    MarkMask(chan%, -1, 1, -1);  'Set all codes for all layers
+    MarkMask(chan%, 0, 0, 1);
+    NumEnds% := Count(chan%, StartT, EndT);
+
+    docase 
+        case(NumStarts%=NumEnds%) then
+            'looks good pass
+        case (NumStarts%>NumEnds%) then
+            message("Too many starts, - %d starts, only %d ends", NumStarts%, NumEnds%);
+            NumStarts% := -1;
+        else 
+            message("Too many ends, - %d ends, only %d starts", NumEnds%, NumStarts%);
+            NumStarts% := -1;
+    endcase;
+    'Unset mask (ideally would save and restore mask, but Fthat)    
+    MarkMask(chan%, -1, 1, -1);  'Set all codes for all layers
+    return (NumStarts%);
+end
+
+proc InvrtBrstMake(chan%)
+    'Want to invert the channel and set the DrawMode to 'State' like
+    var codematch% := 1; 'codematch will be zero when match found
+    var nextcode%[4];
+    var j% := 0;
+    var time := 0;
+    time := 0;
+    while time>=0 do
+        time := NextTime(chan%,time,nextcode%[]);
+        ArrMul(nextcode%[], -1);
+        ArrAdd(nextcode%[], 1);
+        MarkEdit(chan%, time, nextcode%[]);
+    wend;
+    ' this method of inversion completely inverts the array 0 0 0 0 becomes 1 1 1 1 
+    ' I want 0 0 0 0 to be 1 0 0 0, so just munually zero remaning codes
+    var ZeroCode%[4];
+    ZeroCode%[0] := -1;
+    ArrConst(ZeroCode%[1:], 0);
+    MarkSet(chan%, 0, MaxTime(), ZeroCode%[]);
+    DrawMode(chan%, 15, 0, 0, 2);
+end
+

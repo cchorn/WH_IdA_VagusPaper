@@ -1,0 +1,6 @@
+,Experiment,Baseline,file_name,chan_name,Laser_start,Laser_end,PreLaserFreq,PreLaserNumEvents,LaserFreq,LaserNumEvents
+0,2018_05_21,0.311,EMG_WH_Block-18,Stmch_spk,61.403,81.1037,0.2,2,2.0304,40
+1,2018_05_21,0.311,EMG_WH_Block-18,Stmch_spk,101.4147,121.1154,0.2462,5,1.7766,35
+2,2018_05_21,0.311,EMG_WH_Block-18,Stmch_spk,141.4264,161.1268,0.3939,8,1.7766,35
+3,2018_05_21,0.311,EMG_WH_Block-18,Stmch_spk,181.4377,201.1385,0.3446,7,1.9796,39
+4,2018_05_21,0.311,EMG_WH_Block-18,Stmch_spk,221.4494,241.1502,0.1969,4,2.0811,41

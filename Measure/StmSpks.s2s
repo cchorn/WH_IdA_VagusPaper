@@ -1,0 +1,135 @@
+'protraction channel
+'retraction channel
+'first select protractions and retraction channels
+'SELECT i2 burst channel 
+#include "include\basic_view.s2s"     'this will bring in two globals: GVt% and GChanList%[]
+#include "include\WinPathEscape.s2s"   'bring in ParentDir$
+#include "include\marker_code_iter.s2s"
+var protraction%;
+var SnglSlctChn%[2];
+
+'SELECT a Laser channel
+var LaserChan%;
+Interact("Select stimulus 10 00 (burst) channel", 65536, 0, "&O Okay");
+ChanList(SnglSlctChn%, 65536);
+LaserChan%:= SnglSlctChn%[1];
+
+'SELECT measurement channels
+var MultSlctChn%[10];
+var NumMsrChans%;
+Interact("select all your measurement channels", 65536, 0, "&O Okay");
+ChanList(MultSlctChn%[],65536);
+NumMsrChans% := MultSlctChn%[0];
+resize MultSlctChn%[NumMsrChans%+1];
+
+'''FILE NAMES PREP, and FILE INF PREP'''
+    var GFName$, GDirString$, GFullFName$;
+    var GFileTimeVec%[7];
+    var NumHeaders%;
+    GFullFName$ := FileName$();
+    GFName$ := Print$("%s%s",FileName$(3),FileName$(4));
+    GDirString$ := ParentDir$(FileName$());
+    
+    'CREATE measurement views/files
+    var MsrmntViews%[10];
+    var j%;
+    var GDelim$ := ",";
+    resize MsrmntViews%[NumMsrChans%+1];
+    PrepFiles(MultSlctChn%[], MsrmntViews%[], GFName$)
+    PrepHeaderBtm(",",MsrmntViews%[]);
+
+'''END FILE NAMES PREP'''
+
+var Laserstart, Laserend;
+
+while Laserstart>-1 do
+    Laserstart := GetNextCode(LaserChan%, Laserstart, startcode%[]);
+    Laserend := GetNextCode(LaserChan%, Laserstart, endcode%[]);
+    RecordLaserEvents(MultSlctChn%[], MsrmntViews%[], LaserChan%, Laserstart, Laserend)
+wend;
+
+SvCls(MultSlctChn%[], MsrmntViews%[]);
+
+'SAVE AND CLOSE FILES
+proc SvCls(Chans%[], Views%[]);
+    var j%, ChnNm$;
+    for j% := 1 to Views%[0] do
+        View(GVt%);
+        ChnNm$ := ChanTitle$(Chans%[j%]);
+        ChnNm$:= Print$("%s_%s.csv", GFName$, ChnNm$);
+        View(Views%[j%]);
+        FilePathSet(GDirString$); FileSaveAs(ChnNm$,1); FileClose();
+    next;
+end
+
+proc PrepHeaderBtm(delim$, Views%[])
+    var i%;
+    for i% := 1 to Views%[0] do
+        View(Views%[i%]);
+        'names
+        Print("%s%s", "file_name", delim$);
+        Print("%s%s", "chan_name", delim$);
+        Print("%s%s", "Laser_start", delim$);
+        Print("%s%s", "Laser_end", delim$);
+        Print("%s%s", "PreLaserFreq", delim$);
+        Print("%s%s", "PreLaserNumEvents", delim$);
+        Print("%s%s", "LaserFreq", delim$);
+        Print("%s%s", "LaserNumEvents", delim$);
+        Print("\n");
+    next;
+    FrontView(GVt%)
+end
+
+Proc RecordLaserEvents(MultSlctChn%[], MsrmntViews%[], LaserChan%, Laserstart, Laserend)
+    var i%;
+    for i% := 1 to MultSlctChn%[0] do
+        MkWrtMPMsrs(MultSlctChn%[i%], MsrmntViews%[i%], LaserChan%, Laserstart, Laserend);
+    next;
+end
+
+'PROCS AND FUNCTIONS 
+proc PrepFiles(Chans%[], Views%[], GFName$)
+    var i%, j%;
+    var ChnNm$;
+    for i% := 1 to Chans%[0] do
+        FrontView(GVt%);
+        ChnNm$ := ChanTitle$(Chans%[i%]);
+        Views%[i%] := FileNew(1);
+        Views%[0] := Views%[0] + 1; 
+    next;
+    FrontView(GVt%);
+end
+
+func MkWrtMPMsrs(chan%, vh%, LaserChan%, Laserstart, Laserend)
+    var lastend;
+    var LaserNumEvents%, LaserFreq, LaserEvntsArray[4000];
+    var PreLaserNumEvents%, PreLaserFreq, PreLaserEvntsArray[4000];
+    var ChnNm$;
+    ChnNm$ := ChanTitle$(chan%);
+    Trim(ChnNm$);
+    LaserNumEvents%:= ChanData(chan%,LaserEvntsArray[],Laserstart,Laserend);
+    lastend := GetLastCode(LaserChan%, Laserstart, endcode%[]);
+    if (lastend=-1) then
+        lastend:=Laserstart-10;
+    endif
+    PreLaserNumEvents%:= ChanData(chan%,PreLaserEvntsArray[],lastend,Laserstart);
+    LaserFreq := LaserNumEvents% / (Laserend - Laserstart);
+    PreLaserFreq := PreLaserNumEvents% / (Laserstart - lastend);
+    if(LaserNumEvents%) then 
+        resize LaserEvntsArray[LaserNumEvents%]; 
+        ArrSub(LaserEvntsArray[],Laserstart);
+    endif
+    View(vh%);
+    Print("%s,",GFName$);
+    Print("%s,",ChnNm$);
+    Print("%.4f,",Laserstart);
+    Print("%.4f,",Laserend);
+    Print("%.4f,",PreLaserFreq);
+    Print("%d,",PreLaserNumEvents%);
+    Print("%.4f,",LaserFreq);
+    Print("%d,",LaserNumEvents%);
+    Print("\n");
+View(GVt%);
+end  
+    
+

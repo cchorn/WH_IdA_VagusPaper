@@ -1,0 +1,110 @@
+''' this script is meant to be included in other scripts as a module'''
+''' because of the toolbar functions it works on globals'''
+''' these globals are named starting with a G...'''
+
+func FindSpks(LChan%)
+    var LEventChan%;
+    var LSlopeOrNo%, LTau;
+    var LSpksOkay%:=1;
+    while (LSpksOkay%) do
+        LSlopeOrNo% := Input("compute spikes by peak(1), slope(2), or threshold crossing(3)?", 1);
+        docase
+            case (LSlopeOrNo%=1) then
+                LTau := Input("give a tau in millisec \n(approx 2 x the spike dur works well)\n e.g. for b8, 8-10(ms)\n for b4/5 3ms", 3);
+                LEventChan% := FindSpkPeak(LChan%, LTau);
+            case (LSlopeOrNo%=2) then
+                LTau := Input("give a tau in millisec \n(approx 2 x the spike dur works well)\n e.g. for b8, 8-10(ms)\n for b4/5 3ms", 3);
+                LEventChan% := FindSpkSlp(LChan%, LTau)
+            case (LSlopeOrNo%=3) then
+                LEventChan% := FindSpkThrsh(LChan%);
+        endcase
+        ChanHide(-1); ChanShow(LChan%); ChanShow(LEventChan%);
+        LSpksOkay% := Interact("how does this look?",2,1,"&Y Good||accept the spike theresh and move on to edit individual events","&N Bad||reject spike thresh, and try again");
+        if (LSpksOkay%=1) then break endif;
+    wend
+    return LEventChan%;
+end
+
+func FindSpkPeak(n%, millitau)
+    var eventchantmp%, tmpthresh;
+    var sectau := millitau/1000;
+    var append$ := "spk";
+    PlcCur(n%);
+    Interact("move cursors",1023, 0, "&O Okay");
+    HCursorRenumber();
+    tmpthresh := HCursor(2) - HCursor(1);
+    eventchantmp% := MemChan(2);
+    MemImport(eventchantmp%, n%, 0, MaxTime(), 0, sectau, tmpthresh);
+    setchantitle(n%, eventchantmp%, append$);
+    return eventchantmp%;
+end
+
+func FindSpkSlp(n%, millitau)
+    var slopchantmp%, eventchantmp%, tmpthresh;
+    var append$ := "spk";
+    var sectau := millitau/1000;
+    slopchantmp% := MemChan(0,n%);
+    MemImport(slopchantmp%, n%, 0, MaxTime());
+    ChanProcessAdd((slopchantmp%),3, sectau); 'add a slope channel process 3, time contant for slope calculation is sampling interval about.  '
+    DrawMode(slopchantmp%,0);
+    HCursorDelete(-1);
+    HCursorNew(slopchantmp%); HCursorNew(slopchantmp%);
+    ChanHide(-1); ChanShow(n%); ChanShow(slopchantmp%);
+    Optimise(slopchantmp%);
+    DrawAll();
+    Interact("move cursors",1023, 0, "&O Okay");
+    HCursorRenumber();
+    tmpthresh := HCursor(2) - HCursor(1);
+    eventchantmp% := MemChan(2);
+    MemImport(eventchantmp%, slopchantmp%, 0, MaxTime(), 0, 0.0001, tmpthresh);
+    setchantitle(n%, eventchantmp%, append$);
+    ChanDelete(slopchantmp%);
+    return eventchantmp%;
+end
+
+func FindSpkThrsh(n%)
+    var eventchantmp%, tmpthresh;
+    var append$ := "spk";
+    ChanHide(-1); ChanShow(n%);
+    HCursorDelete(-1);
+    HCursorNew(n%);
+    Interact("move cursor",1023, 0, "&O Okay");
+    tmpthresh := HCursor(1);
+    eventchantmp% := MemChan(2);
+    MemImport(eventchantmp%, n%, 0, MaxTime(), 2, 0.002, tmpthresh);
+    setchantitle(n%, eventchantmp%, append$);
+    return eventchantmp%;
+end
+
+proc PlcCur(chan%)
+    var Unts$;
+    var yrng;
+    var LowCurY, HighCurY;
+    yrng := YHigh(chan%) - YLow(chan%);
+    LowCurY := YLow(chan%) + yrng * 0.3;
+    HighCurY := YHigh(chan%) - yrng * 0.3;
+    ChanHide(-1); ChanShow(chan%);
+    HCursorDelete(-1);
+    Unts$ := MChanUnits$(chan%);
+    if Unts$ = "mV" then
+        LowCurY := -40;
+        HighCurY := 0;
+    endif;
+    HCursorNew(chan%, LowCurY); HCursorNew(chan%, HighCurY);
+end
+
+
+proc setchantitle(inchan%, outchan%, appendstring$)
+    var tmpchantit$;
+    tmpchantit$ := ChanTitle$(inchan%);
+    TrimRight(tmpchantit$);
+    tmpchantit$ := Print$("%s_%s",Left$(tmpchantit$,5),appendstring$);
+    ChanTitle$(outchan%,tmpchantit$);
+end
+
+func MChanUnits$(chan%)
+    var NoWhtUnts$;
+    NoWhtUnts$ := ChanUnits$(chan%);
+    TrimRight(NoWhtUnts$);
+    return NoWhtUnts$
+end
